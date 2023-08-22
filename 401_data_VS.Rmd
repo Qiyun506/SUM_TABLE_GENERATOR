@@ -1,0 +1,84 @@
+```{r}
+source("C:/Users/Avansight/VXX_401/code/Summary_table_funcs.R")
+COMM<-read.csv("C:/Users/Avansight/VXX_401/8_10_task/COMMON_X.csv")
+
+```
+
+```{r}
+VS<-read.csv("C:/Users/Avansight/VXX_401/8_10_task/vax401/simplified/GL_VS.simplified.csv")
+M_data<-pre_process("C:/Users/Avansight/VXX_401/8_10_task/vax401/simplified/GL_VS.simplified.csv",
+            "C:/Users/Avansight/VXX_401/8_10_task/COMMON_X.csv",
+            "",
+            before_baseLine = T,
+            need_to_remove = "Screening",
+            duplicated_title = T
+            )
+M_data2<-pre_process("C:/Users/Avansight/VXX_401/8_10_task/vax401/simplified/GL_VSLOG.simplified.csv",
+            "C:/Users/Avansight/VXX_401/8_10_task/COMMON_X.csv",
+            "",
+            before_baseLine = T,
+            need_to_remove = "Screening",
+            duplicated_title = T
+            )
+
+# raw data process
+
+combine_folder_name<-paste(M_data2$FolderName,"",M_data2$VSTPT_L)
+M_data2$FolderName<-combine_folder_name
+M_data2<-rm_col(M_data2,"VSTPT_L")
+M_data$FolderName<-ifelse(M_data$FolderName == "Day 57","Day 57  Pre-dose",M_data$FolderName)
+
+#M_data<-rbind(M_data,M_data2)
+```
+
+```{r}
+M_keyCols<-names(M_data)[9:13]
+M_long<- M_data %>%
+  pivot_longer(
+    cols = M_keyCols,
+    names_to = "Test",
+    values_to = "score"
+  )
+
+M_keyCols2<-names(M_data2)[10:14]
+M_long2<- M_data2 %>%
+  pivot_longer(
+    cols = M_keyCols2,
+    names_to = "Test",
+    values_to = "score"
+  )
+
+p_M_long<-subset(M_long,select = c("Subject","FolderName","INTP_VSORRES","trtp","Test", "score"))
+p_M_long2<-subset(M_long2,select = c("Subject","FolderName","INTP_VSORRES_L","trtp","Test", "score"))
+
+
+names(p_M_long2)[names(p_M_long2) == "INTP_VSORRES_L"] = "INTP_VSORRES"
+
+MLC<-rbind(p_M_long,p_M_long2)
+MLC$Test<- gsub("_L", "", MLC$Test)
+MLC<-MLC[MLC$score != "",]
+```
+
+```{r}
+keyCols<-unique(MLC$Test)
+b_long<-baseLine_value_long(MLC,"Day 1  Pre-dose",keyCols)
+MLC<-get_change_long(MLC,b_long)
+keyNames<-names(read.csv("C:\\Users\\Avansight\\VXX_401\\ecg_template.csv"))
+```
+
+```{r}
+output_df<-data.frame()
+output<-DRAW_FRAME(MLC,"Day 1")
+for(unit in unique(MLC$Test)){
+  OUT<-get_summary_table_long(output,MLC,"Day 1  Pre-dose",unit,COMM)
+  print(glue("done for {unit} summary making"))
+  output_df<-rbind(output_df,OUT)
+}
+export_data(output_df,"VS_SUMM")
+export_data(MLC,"VS_derived")
+
+```
+
+```{r}
+#USE for run the whole process
+```

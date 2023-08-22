@@ -1,0 +1,255 @@
+
+```{r}
+source("C:/Users/Avansight/VXX_401/code/Summary_table_funcs.R")
+COMM<-read.csv("C:/Users/Avansight/VXX_401/8_10_task/COMMON_X.csv")
+```
+
+#=======================================================
+#start program
+#=======================================================
+```{r}
+M_data<-pre_process("C:/Users/Avansight/VXX_401/8_10_task/vax401/simplified/GL_EG.simplified.csv",
+            "C:/Users/Avansight/VXX_401/8_10_task/COMMON_X.csv",
+            "",
+            before_baseLine = T,
+            need_to_remove = "Screening",
+            duplicated_title = T
+            )
+
+keyCols<-names(M_data)[9:14]
+M_data<-chr_to_num(M_data,keyCols)
+
+M_long<-wide_to_long(M_data,keyCols)
+```
+
+```{r}
+#base_values<-baseLine_value_wide(M_data,"Day 1",keyCols)
+b_long<-baseLine_value_long(M_long,"Day 1",keyCols)
+M_long<-get_change_long(M_long,b_long)
+```
+```{r}
+output_df<-data.frame()
+Baseline = "Day 1"
+output1<-DRAW_FRAME(M_long,Baseline)
+#output1<-read.csv("C:/Users/Avansight/VXX_401/ecg_template.csv")
+for(unit in unique(M_long$Test)){
+  OUT<-get_summary_table_long(output1,M_long,"Day 1",unit,COMM)
+  print(glue("done for {unit} summary making"))
+  output_df<-rbind(output_df,OUT)
+}
+
+export_data(output_df,"EG_SUMM")
+
+export_data(M_long,"EG_Derived")
+#get_summary_table_long(output1,M_long,"Day 1","HR_EGORRES_RAW")
+
+```
+
+
+#=======================================================test code for summary table function===============================================
+```{r}
+Baseline = "Day 1"
+output1<-read.csv("C:/Users/Avansight/VXX_401/ecg_template.csv")
+#output1[is.na(output1)] = 0
+
+num<-nrow(output1)
+output1$Unit<-rep(unique(M_long$Test)[1],times = num)
+
+
+
+global_df<-M_long
+df<-global_df[global_df$Test == unique(M_long$Test)[2],]
+for(i in 1: num){
+  print(i)
+  filter_info<-output1[i,]
+  #first Layer filter for df
+  if(filter_info$Visit == "Baseline"){
+    sum_df<-df[df$FolderName == Baseline & df$trtp == filter_info$Treatment,]
+  }
+  else{
+    sum_df<-df[df$FolderName == filter_info$Visit & df$trtp == filter_info$Treatment,]
+  }
+  #second Layer filter for df
+  if(filter_info$Type == "Actual"){
+    data_vec<-sum_df[["score"]]
+  }
+  else if(filter_info$Type == "Change from Baseline"){
+    no_baseline_df<-sum_df[sum_df$FolderName != Baseline, ]
+    data_vec<-no_baseline_df[["Test_change"]]
+  }
+
+  output1$N[i]<-length(data_vec)
+  output1$n[i]<-length(data_vec)
+  output1$Mean[i]<-mean(data_vec)
+  output1$SD[i]<-sd(data_vec)
+  output1$Median[i]<-median(data_vec)
+  output1$Q1[i]<-quantile(data_vec, 0.25,type = 3)
+  output1$Q3[i]<-quantile(data_vec, 0.75,type = 3)
+  output1$Min[i]<-min(data_vec)
+  output1$Max[i]<-max(data_vec)
+}
+```
+#=======================================================test code for summary table function END===========================================
+
+#for assisting functions 
+
+```{r}
+chr_to_num <- function(df, col_vec) {
+  for(col_name in col_vec){
+    if (col_name %in% names(df) && is.character(df[[col_name]])) {
+      df[[col_name]] <- as.numeric(df[[col_name]])
+    }
+  }
+  return(df)
+}
+
+baseLine_value<-function(df,base_day,studyName_vec){
+  base_df<-df[df$FolderName == base_day,]
+  base_values<-list()
+  for(i in studyName_vec){
+    base_values[[i]] = base_df[[i]]
+  }
+  return(base_values)
+}
+
+get_change<-function(df,studyName,b_value){
+  base_vec<-vector()
+  change_vec<-vector()
+  sub_df<-subset(df,select = c("Subject",studyName))
+  #print(nrow(sub_df))
+  study_baseline<-b_value[[studyName]]
+  freq_vec<-vector()
+  for(subj in 1:length(unique(sub_df$Subject))){
+    his_days<-nrow(sub_df[sub_df == unique(sub_df$Subject)[subj],])
+    freq_vec<-c(freq_vec,his_days)
+  }
+  base_vec<-rep(study_baseline,times = freq_vec )
+  #print(length(base_vec))
+  change_vec<-base_vec - sub_df[[studyName]]
+  #print(freq_vec)
+  #print((change_vec))
+  df[[glue("{studyName}_change")]]<-change_vec
+  print(glue("col {studyName} done for change"))
+  return(df)
+}
+
+pre_process<-function(study_path,common_path,remove = "",before_baseLine = FALSE,need_to_remove = "",duplicated_title = FALSE){
+  df<-read.csv(study_path)
+  comm<-read.csv(common_path)
+  if(duplicated_title){
+    df<-df[2:nrow(df),]
+  }
+  df<-left_join(df,comm, by = "Subject")
+  df<-df[df$trtp != remove,]
+  if(before_baseLine){
+    df<-df[df$FolderName != need_to_remove,]
+  }
+  return(df)
+}
+
+get_sum_table_for_ecg<-function(shell,df,Baseline, studyNames){
+  shell<-shell
+  num<-nrow(shell)
+  #shell[is.na(shell)] = 0
+  for(name in studyNames){
+#=======================================================loop for one study===============================================
+    shell$Unit<-rep(name,times = num)
+    for(i in 1: num){
+      filter_info<-shell[i,]
+      #first Layer filter for df
+      if(filter_info$Visit == "Baseline"){
+        sum_df<-df[df$FolderName == Baseline & df$trtp == filter_info$Treatment,]
+      }
+      else{
+        sum_df<-df[df$FolderName == filter_info$Visit & df$trtp == filter_info$Treatment,]
+      }
+      #second Layer filter for df
+      if(filter_info$Type == "Actual"){
+        data_vec<-sum_df[[filter_info$Unit]]
+      }
+      else if(filter_info$Type == "Change from Baseline"){
+        no_baseline_df<-sum_df[sum_df$FolderName != Baseline, ]
+        data_vec<-no_baseline_df[[glue("{filter_info$Unit}_change")]]
+      }
+      shell$N[i]<-length(data_vec)
+      shell$n[i]<-length(data_vec)
+      shell$Mean[i]<-mean(data_vec)
+      shell$SD[i]<-sd(data_vec)
+      shell$Median[i]<-median(data_vec)
+      shell$Q1[i]<-quantile(data_vec, 0.25,type = 3)
+      shell$Q3[i]<-quantile(data_vec, 0.75,type = 3)
+      shell$Min[i]<-min(data_vec)
+      shell$Max[i]<-max(data_vec)
+    }
+#=======================================================loop for one study END===============================================
+#=======================================================here ↓↓↓↓↓↓↓ we want to output the data==============================
+    write.csv(shell, glue("{getwd()}/{filter_info$Unit}_summ.csv"), row.names=FALSE)
+  }
+}
+```
+
+
+#=======================================================Summary Table with package might be useful for QC==================================
+```{r}
+#temp_list<-list()
+#for(Visit in unique(M_data$FolderName)){
+#  temp_df<-M_data[M_data$FolderName == Visit,]
+  #print(temp_df)
+  
+#  temp_sum<-make.table(dat = temp_df,
+#                  strat = "trtp",
+#                  cont.varlist = keyCols)
+#  temp_list[[Visit]]<-temp_sum
+#}
+```
+#=======================================================Data import raw code for (reference when function get error)=======================
+```{r}
+ECG<-read.csv("C:/Users/Avansight/VXX_401/8_10_task/vax401/simplified/GL_EG.simplified.csv")
+ECG<-ECG[2:nrow(ECG),]
+M_data <- left_join(ECG,COMM, by = "Subject")
+M_data<-M_data[M_data$trtp != "",]
+M_data<-M_data[M_data$FolderName != "Screening",]
+#Key Cols are the col names that have the critical study data
+```
+
+```{r}
+#get_sum_table_for_ecg<-function(shell,df,Baseline, studyNames){
+#  shell<-shell
+#  num<-nrow(shell)
+#  #shell[is.na(shell)] = 0
+#  for(name in studyNames){
+#    #========================loop for one study================================
+#    shell$Unit<-rep(name,times = num)
+#    for(i in 1: num){
+#      filter_info<-shell[i,]
+#      #first Layer filter for df
+#      if(filter_info$Visit == "Baseline"){
+#        sum_df<-df[df$FolderName == Baseline & df$trtp == filter_info$Treatment,]
+#      }
+#      else{
+#        sum_df<-df[df$FolderName == filter_info$Visit & df$trtp == filter_info$Treatment,]
+#      }
+#      #second Layer filter for df
+#      if(filter_info$Type == "Actual"){
+#        data_vec<-sum_df[[filter_info$Unit]]
+#      }
+#      else if(filter_info$Type == "Change from Baseline"){
+#        no_baseline_df<-sum_df[sum_df$FolderName != Baseline, ]
+#        data_vec<-no_baseline_df[[glue("{filter_info$Unit}_change")]]
+#      }
+#      shell$N[i]<-length(data_vec)
+#      shell$n[i]<-length(data_vec)
+#      shell$Mean[i]<-mean(data_vec)
+#      shell$SD[i]<-sd(data_vec)
+#      shell$Median[i]<-median(data_vec)
+#      shell$Q1[i]<-quantile(data_vec, 0.25,type = 3)
+#      shell$Q3[i]<-quantile(data_vec, 0.75,type = 3)
+#      shell$Min[i]<-min(data_vec)
+#      shell$Max[i]<-max(data_vec)
+#    }
+#    #===================================loop for one study END=================
+#    #========================here ↓↓↓↓↓↓↓ we want to output the data===========
+#    write.csv(shell, glue("{getwd()}/{filter_info$Unit}_summ.csv"), row.names=FALSE)
+#  }
+#}
+```

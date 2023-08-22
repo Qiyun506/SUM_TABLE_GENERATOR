@@ -1,0 +1,55 @@
+```{r}
+library(glue)
+library(devtools)
+install_github("emwozniak/Table1")
+library(Table1)
+library(dplyr)
+source("C:/Users/Avansight/VXX_401/code/Summary_table_funcs.R")
+```
+
+```{r}
+M_data<-pre_process("C:/Users/Avansight/VXX_401/8_10_task/vax401/simplified/GL_EG.simplified.csv",
+            "C:/Users/Avansight/VXX_401/8_10_task/COMMON_X.csv",
+            "",
+            before_baseLine = T,
+            need_to_remove = "Screening",
+            duplicated_title = T
+            )
+simple_data<-subset(M_data,select = c("Subject","FolderName","INTP_EGORRES"))
+shift_template<-read.csv("C:/Users/Avansight/VXX_401/ECG_shift_template.csv")
+shift_template[is.na(shift_template)] <- 0
+colnames(shift_template)[colnames(shift_template) == "Abnormal.NCS"] <- "Abnormal NCS"
+colnames(shift_template)[colnames(shift_template) == "Abnormal.CS"] <- "Abnormal CS"
+
+```
+
+```{r}
+Baseline = "Day 1"
+baseline_status<-list()
+baseline_df<-simple_data[simple_data$FolderName == Baseline,]
+for(i in 1: nrow(baseline_df)){
+  baseline_status[[baseline_df$Subject[i]]]<-baseline_df$INTP_EGORRES[i]
+}
+```
+
+```{r}
+fulfill_table<-function(template,df,baseline_status,Visit){
+  
+  part_df<-df[df$FolderName == Visit,]
+  for(i in 1:nrow(part_df)){
+    B_s<-baseline_status[[part_df$Subject[i]]]
+    curr_s<-part_df$INTP_EGORRES[i]
+    num<-template[[curr_s]][template$Visit == Visit & template$BaselineStatus == B_s] 
+    template[[curr_s]][template$Visit == Visit & template$BaselineStatus == B_s] = num + 1
+  }
+  return(template)
+}
+
+for(i in unique(shift_template$Visit)){
+  shift_template<-fulfill_table(shift_template,simple_data,baseline_status,i)
+  print(glue("shift for {i} is done"))
+}
+
+
+fulfill_table(shift_template,simple_data,baseline_status,"Day 8")
+```
