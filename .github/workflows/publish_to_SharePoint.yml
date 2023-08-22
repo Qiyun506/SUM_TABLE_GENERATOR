@@ -1,0 +1,8 @@
+name: Sharepoint Sync
+run-name: ${{github.actor}} is Syncing to SharePoint
+on: push
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
