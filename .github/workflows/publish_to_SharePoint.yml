@@ -1,8 +1,19 @@
-name: Sharepoint Sync
-run-name: ${{github.actor}} is Syncing to SharePoint
+name: 'Sharepoint Sync'
+
 on: push
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    steps:  
+    
+    - name: Cloning repo
+      uses: actions/checkout@v2
 
+    - name: Publish to Sharepoint
+      uses: obrassard/action-sharepoint-publish@v1.1.1
+      with:
+       site_url: 'https://you.sharepoint.com/sites/mySite'
+       library_folder: 'Shared documents/releases'
+       sharepoint_client_id: ${{ secrets.CLIENTID }}
+       sharepoint_client_secret: ${{ secrets.CLIENTSECRET }}
