@@ -13,7 +13,7 @@ jobs:
     - name: Publish to Sharepoint
       uses: obrassard/action-sharepoint-publish@v1.1.1
       with:
-       site_url: 'https://you.sharepoint.com/sites/mySite'
-       library_folder: 'Shared documents/releases'
+       site_url: 'https://avansight-my.sharepoint.com/:f:/g/personal/qiyun_li_avansightinc_com/EnSKSNsPtpBGo2ciTh844_MBOx-54YLyuDwPnEozzUDXvg?e=gYhELp'
+       library_folder: 'My files/AUTO_TOOLS/summary_table'
        sharepoint_client_id: ${{ secrets.CLIENTID }}
        sharepoint_client_secret: ${{ secrets.CLIENTSECRET }}
